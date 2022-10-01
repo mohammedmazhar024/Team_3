@@ -1,0 +1,139 @@
+#include <xc.h>
+#define _XTAL_FREQ 20000000
+#define ENABLE 1
+#define DISABLE 0
+int can_read[1];
+void system_init(void)
+{
+ INTCONbits.GIE=ENABLE;
+ INTCONbits.PEIE=ENABLE;
+}
+void can_init(void)
+{
+    TRISBbits.RB3 = ENABLE;
+    TRISBbits.RB2 = DISABLE;
+    PIE3bits.RXB0IE = ENABLE;
+    IPR3bits.RXB0IP = ENABLE;
+    CANCON |=0x80;
+    while(CANSTAT !=0x80);  //baud rate is 250khz
+    BRGCON1=0xC1;
+    BRGCON2=0xAE;
+    BRGCON3=0x45;
+    CIOCON=0x20;
+    CANCON=0x08;  
+}
+void transmit()
+{
+ CANCON=0x08;
+ TXB1SIDH=0xff;
+ TXB1SIDL=0x80;
+ TXB1DLC=0x01;
+ TXB1D0=0X01; 
+return;
+ }
+void receive()
+{
+ CANCON=0x08;
+ RXM1SIDH=0xff;
+ RXM1SIDL=0x80;
+ RXB1DLC=0x01;
+ RXERRCNT=0x08;
+ RXB1CON=0x08;
+ can_read[0]=RXB0D0;    
+ RXB0CONbits.RXFUL=1;
+ RXB0CON=0x08; 
+ if(PORTBbits.RB3==1)
+ {
+     LATBbits.LB4=0;
+ }
+}
+void set_baudrate()  
+{
+        CANCON=0x80;     //CANCON into configuration mode.
+        BRGCON1=0xC1;   
+        BRGCON2=0xAE;    //
+        BRGCON3=0x45;
+        CIOCON=0x20;
+        CANCON=0x00;    //CANCON into normal mode.
+        __delay_ms(100); 
+    
+}
+void mask_set() 
+{
+    CANCON=0x80;   //CANCON into Configuration mode.
+    RXM0SIDL=0x00; //Enable acceptance mask 0 standard identifier mask low byte.
+    RXM0SIDH=0x00; //Enable acceptance mask 0 standard identifier mask high byte.
+    CANCON=0x00;   //CANCON into Normal mode.
+    __delay_ms(100);    
+}
+void filter_set()
+{
+    CANCON=0x80;   //CANCON into Configuration mode.
+    RXF0SIDH=0x00; //Enable acceptance Filter 0 standard identifier high byte.
+    RXF0SIDL=0x00; //Enable acceptance Filter 0 standard identifier low byte.
+    CANCON=0x00;   //CANCON into Normal mode.
+    __delay_ms(100);    
+}
+void interrupt ex(void)
+{
+      INTCONbits.GIE=0;
+      if(INTCONbits.INT0IF)
+      {
+          if(PORTBbits.RB1==1 && PORTBbits.RB0==0)
+          {
+           PORTBbits.RB6=0;  
+           PORTBbits.RB4=1;
+          }
+          INTCONbits.INT0IF=0;
+          if(PORTBbits.RB0==1 && PORTBbits.RB1==0)
+          {
+              while(1)
+              {
+                   __delay_ms(200);
+                PORTBbits.RB6=1;
+                __delay_ms(200);
+                PORTBbits.RB6=0;
+              }
+          }
+          INTCONbits.INT0IF=0;
+          if(PORTBbits.RB0==1 && PORTBbits.RB1==1)
+          {
+              while(1)
+              {
+                  __delay_ms(1000);
+                PORTBbits.RB6=1;
+                __delay_ms(1000);
+                PORTBbits.RB6=0;
+              }
+          }
+          INTCONbits.INT0IF=0;
+      }
+      INTCONbits.GIE=1;
+}
+void main(void)
+{
+    system_init();
+    can_init();
+    mask_set();
+    filter_set();
+    set_baudrate();
+    transmit();
+    receive();
+    INTCONbits.INT0F=1;
+    RCONbits.IPEN=1;
+    INTCON3bits.INT1E=1;
+    INTCON3bits.INT1P=0;
+    INTCON2bits.INTEDG1=1;
+    INTCONbits.INT0IE=1;
+    INTCON2bits.INTEDG0=1;
+    TRISBbits.RB0=1;
+    TRISBbits.RB1=1;
+    TRISBbits.RB4=0;
+    LATBbits.LB4=1;
+    TRISBbits.RB6=0;
+    TRISBbits.RB4=0;
+    TRISBbits.RB2=0;
+    PORTBbits.RB4=0;
+    PORTBbits.RB6=1;
+    while(1){}
+}
